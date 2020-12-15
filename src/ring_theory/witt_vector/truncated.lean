@@ -371,15 +371,12 @@ end truncated_witt_vector
 namespace witt_vector
 open truncated_witt_vector (hiding truncate coeff)
 
-section lift
+section lift_fun
 
 variable [comm_ring R]
-variables {S : Type*} [comm_ring S]
-variable (f : Π k : ℕ, S →+* truncated_witt_vector p k R)
-variable f_compat : ∀ (k₁ k₂ : ℕ) (hk : k₁ ≤ k₂),
-           (truncated_witt_vector.truncate hk).comp (f k₂) = f k₁
+variables {S : Type*} (f : Π k : ℕ, S → truncated_witt_vector p k R)
+variables (hf : ∀ k₁ k₂ (hk : k₁ ≤ k₂) s, (truncated_witt_vector.truncate hk) (f k₂ s) = f k₁ s)
 variables {p R}
-variable (n)
 
 /--
 Given a family `fₖ : S → truncated_witt_vector p k R` and `s : S`, we produce a Witt vector by
@@ -389,20 +386,167 @@ def lift_fun (s : S) : 𝕎 R :=
 witt_vector.mk p $ λ k, truncated_witt_vector.coeff (fin.last k) (f (k+1) s)
 
 variables {f}
-include f_compat
+include hf
 
 @[simp] lemma truncate_lift_fun (s : S) :
   witt_vector.truncate n (lift_fun f s) = f n s :=
 begin
   ext i,
-  simp only [lift_fun, truncated_witt_vector.coeff_mk, witt_vector.truncate_mk],
-  rw [← f_compat (i+1) n i.is_lt, ring_hom.comp_apply, truncated_witt_vector.coeff_truncate],
+  simp only [lift_fun, truncated_witt_vector.coeff_mk, witt_vector.truncate_mk,
+    ← hf (↑i + 1) n i.is_lt, truncated_witt_vector.coeff_truncate],
   -- this is a bit unfortunate
   congr' with _,
-  simp only [fin.coe_last, fin.coe_cast_le],
+  simp only [fin.coe_last, fin.coe_cast_le]
 end
 
-variable (f)
+/-- The uniqueness part of the universal property of `𝕎 R`. -/
+lemma lift_fun_unique (g : S → 𝕎 R) (hg : ∀ k s, (witt_vector.truncate k) (g s) = f k s) :
+  lift_fun f = g :=
+begin
+  ext1 x,
+  rw [← sub_eq_zero, ← ideal.mem_bot, ← infi_ker_truncate, ideal.mem_infi],
+  intro i,
+  simp only [ring_hom.mem_ker, ← hg, truncate_lift_fun hf, ring_hom.map_sub, sub_self]
+end
+
+omit hf
+include hp
+
+/-- The universal property of `𝕎 R` as projective limit of truncated Witt vector rings. -/
+@[simps] def lift_fun_equiv : {f : Π k, S → truncated_witt_vector p k R // ∀ k₁ k₂ (hk : k₁ ≤ k₂) s,
+  (truncated_witt_vector.truncate hk) (f k₂ s) = f k₁ s} ≃ (S → 𝕎 R) :=
+{ to_fun := λ f, lift_fun f.1,
+  inv_fun := λ g, ⟨λ k, (truncate k) ∘ g,
+    by { intros _ _ h x, rw [← truncate_comp_witt_vector_truncate h], refl }⟩,
+  left_inv := by { rintro ⟨f, hf⟩, simp only, ext n s : 2, exact truncate_lift_fun hf s },
+  right_inv := λ g, lift_fun_unique
+    (by { intros, simp only [truncate_witt_vector_truncate, function.comp_app] })
+    _ (λ _ _, rfl) }
+
+lemma fun_ext (g₁ g₂ : S → 𝕎 R) (h : ∀ k, (truncate k) ∘ g₁ = (truncate k) ∘ g₂) :
+  g₁ = g₂ :=
+lift_fun_equiv.symm.injective $ subtype.ext $ funext h
+
+end lift_fun
+
+section lift_monoid_hom
+
+variable [comm_ring R]
+variables {S : Type*} [monoid S] (f : Π k : ℕ, S →* truncated_witt_vector p k R)
+variables (hf : ∀ k₁ k₂ (hk : k₁ ≤ k₂) x, (truncated_witt_vector.truncate hk) (f k₂ x) = f k₁ x)
+variables {p R}
+
+include hf
+
+/--
+Given compatible monoid homs from `M` into `truncated_witt_vector n` for each `n`,
+we can lift these to a monoid hom `S → 𝕎 R`.
+
+`lift` defines the universal property of `𝕎 R` as the inverse limit of `truncated_witt_vector n`.
+-/
+def lift_monoid_hom : S →* 𝕎 R :=
+by refine_struct { to_fun := lift_fun (λ k, f k) };
+   { intros,
+     rw [← sub_eq_zero, ← ideal.mem_bot, ← infi_ker_truncate, ideal.mem_infi],
+     simp [hf, ring_hom.mem_ker] }
+
+variable {f}
+
+@[simp] lemma truncate_lift_monoid_hom (s : S) :
+  witt_vector.truncate n (lift_monoid_hom _ hf s) = f n s :=
+truncate_lift_fun hf _
+
+@[simp] lemma truncate_comp_lift_monoid_hom :
+  monoid_hom.comp (↑(@witt_vector.truncate p hp n R _)) (lift_monoid_hom _ hf) = f n :=
+by { ext1, exact truncate_lift_monoid_hom _ _ }
+
+/-- The uniqueness part of the universal property of `𝕎 R` for monoid homs. -/
+lemma lift_monoid_hom_unique (g : S →* 𝕎 R) (hg : ∀ k s, (witt_vector.truncate k) (g s) = f k s) :
+  lift_monoid_hom _ hf = g :=
+by { apply monoid_hom.coe_inj, exact lift_fun_unique hf _ hg }
+
+omit hf
+include hp
+
+/-- The universal property of `𝕎 R` as projective limit of truncated Witt vector rings. -/
+@[simps] def lift_monoid_hom_equiv :
+  {f : Π k, S →* truncated_witt_vector p k R // ∀ k₁ k₂ (hk : k₁ ≤ k₂) s,
+  (truncated_witt_vector.truncate hk) (f k₂ s) = f k₁ s} ≃ (S →* 𝕎 R) :=
+{ to_fun := λ f, lift_monoid_hom f.1 f.2,
+  inv_fun := λ g, ⟨λ k, monoid_hom.comp (↑(@truncate p hp k R _)) g,
+    by { intros _ _ h x, rw [← truncate_comp_witt_vector_truncate h], refl }⟩,
+  left_inv := by { rintro ⟨f, hf⟩, simp only [truncate_comp_lift_monoid_hom] },
+  right_inv := λ g, lift_monoid_hom_unique _ _ (λ _ _, rfl) }
+
+lemma monoid_hom_ext (g₁ g₂ : S →* 𝕎 R) (h : ∀ k s, truncate k (g₁ s) = truncate k (g₂ s)) :
+  g₁ = g₂ :=
+lift_monoid_hom_equiv.symm.injective $ by { ext : 3, apply h }
+
+end lift_monoid_hom
+
+section lift_add_monoid_hom
+
+variable [comm_ring R]
+variables {S : Type*} [add_monoid S] (f : Π k : ℕ, S →+ truncated_witt_vector p k R)
+variables (hf : ∀ k₁ k₂ (hk : k₁ ≤ k₂) x, (truncated_witt_vector.truncate hk) (f k₂ x) = f k₁ x)
+variables {p R}
+
+include hf
+
+/--
+Given compatible monoid homs from `M` into `truncated_witt_vector n` for each `n`,
+we can lift these to a monoid hom `S → 𝕎 R`.
+
+`lift` defines the universal property of `𝕎 R` as the inverse limit of `truncated_witt_vector n`.
+-/
+def lift_add_monoid_hom : S →+ 𝕎 R :=
+by refine_struct { to_fun := lift_fun (λ k, f k) };
+   { intros,
+     rw [← sub_eq_zero, ← ideal.mem_bot, ← infi_ker_truncate, ideal.mem_infi],
+     simp [hf, ring_hom.mem_ker] }
+
+variable {f}
+
+@[simp] lemma truncate_lift_add_monoid_hom (s : S) :
+  witt_vector.truncate n (lift_add_monoid_hom _ hf s) = f n s :=
+truncate_lift_fun hf _
+
+@[simp] lemma truncate_comp_lift_add_monoid_hom :
+  add_monoid_hom.comp (↑(@witt_vector.truncate p hp n R _)) (lift_add_monoid_hom _ hf) = f n :=
+by { ext1, exact truncate_lift_add_monoid_hom _ _ }
+
+/-- The uniqueness part of the universal property of `𝕎 R` for additive monoid homs. -/
+lemma lift_add_monoid_hom_unique (g : S →+ 𝕎 R) (hg : ∀ k s, (witt_vector.truncate k) (g s) = f k s) :
+  lift_add_monoid_hom _ hf = g :=
+by { apply add_monoid_hom.coe_inj, exact lift_fun_unique hf _ hg }
+
+omit hf
+include hp
+
+/-- The universal property of `𝕎 R` as projective limit of truncated Witt vector rings. -/
+@[simps] def lift_add_monoid_hom_equiv :
+  {f : Π k, S →+ truncated_witt_vector p k R // ∀ k₁ k₂ (hk : k₁ ≤ k₂) s,
+  (truncated_witt_vector.truncate hk) (f k₂ s) = f k₁ s} ≃ (S →+ 𝕎 R) :=
+{ to_fun := λ f, lift_add_monoid_hom f.1 f.2,
+  inv_fun := λ g, ⟨λ k, add_monoid_hom.comp (↑(@truncate p hp k R _)) g,
+    by { intros _ _ h x, rw [← truncate_comp_witt_vector_truncate h], refl }⟩,
+  left_inv := by { rintro ⟨f, hf⟩, simp only [truncate_comp_lift_add_monoid_hom] },
+  right_inv := λ g, lift_add_monoid_hom_unique _ _ (λ _ _, rfl) }
+
+lemma add_monoid_hom_ext (g₁ g₂ : S →+ 𝕎 R) (h : ∀ k s, truncate k (g₁ s) = truncate k (g₂ s)) :
+  g₁ = g₂ :=
+lift_add_monoid_hom_equiv.symm.injective $ by { ext : 3, apply h }
+
+end lift_add_monoid_hom
+
+section lift
+
+variable [comm_ring R]
+variables {S : Type*} [semiring S]
+variables (f : Π k : ℕ, S →+* truncated_witt_vector p k R)
+variables (hf : ∀ k₁ k₂ (hk : k₁ ≤ k₂) s, truncated_witt_vector.truncate hk (f k₂ s) = f k₁ s)
+variables {p R}
+include hf
 
 /--
 Given compatible ring homs from `S` into `truncated_witt_vector n` for each `n`, we can lift these
@@ -411,24 +555,26 @@ to a ring hom `S → 𝕎 R`.
 `lift` defines the universal property of `𝕎 R` as the inverse limit of `truncated_witt_vector n`.
 -/
 def lift : S →+* 𝕎 R :=
-by refine_struct { to_fun := lift_fun f };
-   { intros,
-     rw [← sub_eq_zero, ← ideal.mem_bot, ← infi_ker_truncate, ideal.mem_infi],
-     simp [ring_hom.mem_ker, f_compat] }
+{ to_fun := lift_fun (λ k, f k),
+  map_zero' := by { convert (lift_add_monoid_hom (λ k, ↑(f k)) _).map_zero,
+    { funext k, refl } },
+  -- map_one' := (lift_monoid_hom _ hf).map_one,
+  map_add' := _,
+    }
 
 variable {f}
 
 @[simp] lemma truncate_lift (s : S) :
-  witt_vector.truncate n (lift _ f_compat s) = f n s :=
-truncate_lift_fun _ f_compat s
+  witt_vector.truncate n (lift _ hf s) = f n s :=
+truncate_lift_fun _ hf s
 
 @[simp] lemma truncate_comp_lift :
-  (witt_vector.truncate n).comp (lift _ f_compat) = f n :=
+  (witt_vector.truncate n).comp (lift _ hf) = f n :=
 by { ext1, rw [ring_hom.comp_apply, truncate_lift] }
 
 /-- The uniqueness part of the universal property of `𝕎 R`. -/
 lemma lift_unique (g : S →+* 𝕎 R) (g_compat : ∀ k, (witt_vector.truncate k).comp g = f k) :
-  lift _ f_compat = g :=
+  lift _ hf = g :=
 begin
   ext1 x,
   rw [← sub_eq_zero, ← ideal.mem_bot, ← infi_ker_truncate, ideal.mem_infi],
@@ -437,7 +583,7 @@ begin
     truncate_comp_lift, ring_hom.map_sub, sub_self],
 end
 
-omit f_compat
+omit hf
 include hp
 
 /-- The universal property of `𝕎 R` as projective limit of truncated Witt vector rings. -/
