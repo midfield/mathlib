@@ -1174,7 +1174,7 @@ def subtype_pi_equiv_pi {α : Sort u} {β : α → Sort v} {p : Πa, β a → Pr
 
 /-- A subtype of a product defined by componentwise conditions
 is equivalent to a product of subtypes. -/
-def subtype_prod_equiv_prod {α : Type u} {β : Type v} {p : α → Prop} {q : β → Prop} :
+@[simps] def subtype_prod_equiv_prod {α : Type u} {β : Type v} {p : α → Prop} {q : β → Prop} :
   {c : α × β // p c.1 ∧ q c.2} ≃ ({a // p a} × {b // q b}) :=
 ⟨λ x, ⟨⟨x.1.1, x.2.1⟩, ⟨x.1.2, x.2.2⟩⟩,
  λ x, ⟨⟨x.1.1, x.2.1⟩, ⟨x.1.2, x.2.2⟩⟩,

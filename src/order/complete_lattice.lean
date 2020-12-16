@@ -636,6 +636,10 @@ lemma binfi_inf {p : ι → Prop} {f : Π i (hi : p i), α} {a : α} (h : ∃ i,
 by haveI : nonempty {i // p i} := (let ⟨i, hi⟩ := h in ⟨⟨i, hi⟩⟩);
   rw [infi_subtype', infi_subtype', infi_inf]
 
+lemma inf_binfi {p : ι → Prop} {f : Π i (hi : p i), α} {a : α} (h : ∃ i, p i) :
+  a ⊓ (⨅i (h : p i), f i h) = (⨅ i (h : p i), a ⊓ f i h) :=
+by simpa only [inf_comm] using binfi_inf h
+
 theorem supr_sup_eq {f g : β → α} : (⨆ x, f x ⊔ g x) = (⨆ x, f x) ⊔ (⨆ x, g x) :=
 @infi_inf_eq (order_dual α) β _ _ _
 
@@ -810,12 +814,6 @@ infi_of_empty nonempty_empty
 @[simp] theorem supr_empty {s : empty → α} : supr s = ⊥ :=
 supr_of_empty nonempty_empty
 
-@[simp] theorem infi_unit {f : unit → α} : (⨅ x, f x) = f () :=
-le_antisymm (infi_le _ _) (le_infi $ assume ⟨⟩, le_refl _)
-
-@[simp] theorem supr_unit {f : unit → α} : (⨆ x, f x) = f () :=
-le_antisymm (supr_le $ assume ⟨⟩, le_refl _) (le_supr _ _)
-
 lemma supr_bool_eq {f : bool → α} : (⨆b:bool, f b) = f tt ⊔ f ff :=
 le_antisymm
   (supr_le $ assume b, match b with tt := le_sup_left | ff := le_sup_right end)
@@ -853,8 +851,14 @@ le_antisymm
   (le_infi $ assume i, le_infi $ assume j, infi_le _ _)
   (le_infi $ assume ⟨i, h⟩, infi_le_of_le i $ infi_le _ _)
 
+theorem infi_prod' {γ : Type*} {f : β → γ → α} : (⨅ i j, f i j) = (⨅ x : β × γ, f x.1 x.2) :=
+(@infi_prod _ _ _ _ (function.uncurry f)).symm
+
 theorem supr_prod {γ : Type*} {f : β × γ → α} : (⨆ x, f x) = (⨆ i j, f (i, j)) :=
 @infi_prod (order_dual α) _ _ _ _
+
+theorem supr_prod' {γ : Type*} {f : β → γ → α} : (⨆ i j, f i j) = (⨆ x : β × γ, f x.1 x.2) :=
+@infi_prod' (order_dual α) _ _ _ _
 
 theorem infi_sum {γ : Type*} {f : β ⊕ γ → α} :
   (⨅ x, f x) = (⨅ i, f (sum.inl i)) ⊓ (⨅ j, f (sum.inr j)) :=

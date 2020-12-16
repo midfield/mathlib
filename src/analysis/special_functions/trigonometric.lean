@@ -1623,6 +1623,8 @@ begin
   exact div_self (ne_of_gt h),
 end
 
+@[simp] lemma tan_pi_div_two : tan (π / 2) = 0 := by simp [tan_eq_sin_div_cos]
+
 lemma tan_pos_of_pos_of_lt_pi_div_two {x : ℝ} (h0x : 0 < x) (hxp : x < π / 2) : 0 < tan x :=
 by rw tan_eq_sin_div_cos; exact div_pos (sin_pos_of_pos_of_lt_pi h0x (by linarith))
   (cos_pos_of_mem_Ioo ⟨by linarith, hxp⟩)
@@ -2157,35 +2159,17 @@ calc cos x = cos y ↔ cos x - cos y = 0 : sub_eq_zero.symm
 ... ↔ (∃ k : ℤ, y = 2 * k * π + x) ∨ (∃ k :ℤ, y = 2 * k * π - x) :
 begin
   apply or_congr;
-  rw sin_eq_zero_iff;
-  field_simp [(by norm_num : -(2:ℂ) ≠ 0)],
-  work_on_goal 0 -- material specific to the left of the `or`, when x ≅ y mod 2π
-  { split,
-    all_goals
-    { rintros ⟨k, hk⟩,
-      refine ⟨-k, eq.symm _⟩ } },
-  work_on_goal 2 -- material specific to the right of the `or`, when x ≅ -y mod 2π
-  { refine exists_congr (λ k, ⟨λ hk, _, λ hk, _⟩) },
-  all_goals -- joint material for showing two equations differ by a constant
-  { rw ← sub_eq_zero at hk ⊢,
-    convert hk using 1,
-    try { push_cast },
-    ring }
+    field_simp [sin_eq_zero_iff, (by norm_num : -(2:ℂ) ≠ 0), eq_sub_iff_add_eq',
+      sub_eq_iff_eq_add, mul_comm (2:ℂ), mul_right_comm _ (2:ℂ)],
+  split; { rintros ⟨k, rfl⟩, use -k, simp, },
 end
 ... ↔ ∃ k : ℤ, y = 2 * k * π + x ∨ y = 2 * k * π - x : exists_or_distrib.symm
 
 lemma sin_eq_sin_iff {x y : ℂ} :
   sin x = sin y ↔ ∃ k : ℤ, y = 2 * k * π + x ∨ y = (2 * k + 1) * π - x :=
 begin
-  rw [←complex.cos_sub_pi_div_two, ←complex.cos_sub_pi_div_two, cos_eq_cos_iff],
-  simp only [exists_or_distrib],
-  apply or_congr;
-  refine exists_congr (λ k, ⟨_, _⟩);
-  { intros h,
-    rw ← sub_eq_zero at ⊢ h,
-    convert h using 1,
-    field_simp,
-    ring },
+  simp only [← complex.cos_sub_pi_div_two, cos_eq_cos_iff, sub_eq_iff_eq_add],
+  refine exists_congr (λ k, or_congr _ _); refine eq.congr rfl _; field_simp; ring
 end
 
 lemma has_deriv_at_tan {x : ℂ} (h : ∀ k : ℤ, x ≠ (2 * k + 1) * π / 2) :
@@ -2194,6 +2178,14 @@ begin
   convert has_deriv_at.div (has_deriv_at_sin x) (has_deriv_at_cos x) (cos_ne_zero_iff.mpr h),
   rw ← sin_sq_add_cos_sq x,
   ring,
+end
+
+lemma tendsto_abs_tan_pi_div_two : tendsto (λ x, abs (tan x)) (𝓝[{π / 2}ᶜ] (π / 2)) at_top :=
+begin
+  simp only [tan_eq_sin_div_cos, abs_div],
+  refine tendsto.mul_at_top _ continuous_sin.continuous_within_at.norm (tendsto.inv_tendsto_zero _),
+  { simp [zero_lt_one] },
+  {  }
 end
 
 lemma differentiable_at_tan {x : ℂ} (h : ∀ k : ℤ, x ≠ (2 * k + 1) * π / 2) : differentiable_at ℂ tan x :=
