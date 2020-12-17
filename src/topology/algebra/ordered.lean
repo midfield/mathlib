@@ -2512,12 +2512,6 @@ section linear_ordered_add_comm_group
 
 variables [linear_ordered_add_comm_group α] [topological_space α]
 
-lemma continuous_abs
-lemma tendsto_abs_nhds'_zero [linear_ordered_add_comm_group α] [topological_space α]
-  [order_topology α] :
-  tendsto (abs : α → α) (𝓝[{0}ᶜ] 0) (𝓝[Ioi 0] 0) :=
-tendsto.inf (by simpa only [abs_zero] using continuous_abs.tendsto 0) _
-
 local notation `|` x `|` := abs x
 
 lemma nhds_eq_infi_abs_sub [order_topology α] (a : α) :
